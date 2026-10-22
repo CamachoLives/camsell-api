@@ -1,0 +1,882 @@
+openapi: 3.1.0
+info:
+  title: Camsell API
+  version: 1.0.0
+  description: |
+    Marketplace parametrizable de compra y venta de vehiculos.
+
+    **Parametrizacion.** Las caracteristicas de un vehiculo no estan codificadas:
+    se administran como grupos de parametros. El cliente consulta
+    `GET /parameters/groups` y construye con esa respuesta los filtros de
+    busqueda y los campos del formulario de publicacion. Crear un grupo nuevo lo
+    hace aparecer en la interfaz sin cambios en el codigo.
+
+    **Errores.** Todas las respuestas de error siguen RFC 9457 (`ProblemDetail`)
+    e incluyen un campo `code` estable para que el cliente reaccione sin
+    interpretar textos.
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8080
+    description: Desarrollo local
+
+tags:
+  - name: Autenticacion
+  - name: Parametros
+  - name: Marcas
+  - name: Catalogo
+  - name: Compra
+  - name: Noticias
+  - name: Administracion
+
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [Autenticacion]
+      summary: Crear una cuenta
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterPayload' }
+      responses:
+        '201': { description: Cuenta creada, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /api/v1/auth/login:
+    post:
+      tags: [Autenticacion]
+      summary: Iniciar sesion
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginPayload' }
+      responses:
+        '200': { description: Sesion iniciada, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /api/v1/auth/me:
+    get:
+      tags: [Autenticacion]
+      summary: Perfil del usuario autenticado
+      responses:
+        '200': { description: Perfil, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+    put:
+      tags: [Autenticacion]
+      summary: Actualizar el perfil
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProfilePayload' }
+      responses:
+        '200': { description: Perfil actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+
+  /api/v1/auth/me/password:
+    put:
+      tags: [Autenticacion]
+      summary: Cambiar la clave
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 8, maxLength: 72 }
+      responses:
+        '204': { description: Clave actualizada }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /api/v1/parameters/groups:
+    get:
+      tags: [Parametros]
+      summary: Esquema completo de parametros
+      description: Fuente de verdad para filtros y formularios dinamicos del cliente.
+      security: []
+      parameters:
+        - name: includeInactive
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Grupos con sus opciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ParameterGroup' }
+
+  /api/v1/parameters/groups/{code}:
+    get:
+      tags: [Parametros]
+      summary: Un grupo por codigo
+      security: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string }, example: FUEL_TYPE }
+      responses:
+        '200': { description: Grupo, content: { application/json: { schema: { $ref: '#/components/schemas/ParameterGroup' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /api/v1/parameters/groups/{code}/options:
+    get:
+      tags: [Parametros]
+      summary: Opciones de un grupo
+      security: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+        - { name: includeInactive, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: Opciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ParameterOption' }
+
+  /api/v1/brands:
+    get:
+      tags: [Marcas]
+      summary: Marcas activas
+      security: []
+      parameters:
+        - { name: withModels, in: query, schema: { type: boolean, default: true } }
+      responses:
+        '200':
+          description: Marcas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Brand' }
+
+  /api/v1/brands/{brandId}/models:
+    get:
+      tags: [Marcas]
+      summary: Modelos de una marca
+      security: []
+      parameters:
+        - { name: brandId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: Modelos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/VehicleModel' }
+
+  /api/v1/listings:
+    get:
+      tags: [Catalogo]
+      summary: Buscar vehiculos en venta
+      security: []
+      parameters:
+        - { name: text, in: query, schema: { type: string }, description: Busca en titulo, marca, modelo, descripcion y referencia }
+        - { name: brandIds, in: query, schema: { type: array, items: { type: integer, format: int64 } } }
+        - { name: modelIds, in: query, schema: { type: array, items: { type: integer, format: int64 } } }
+        - { name: minYear, in: query, schema: { type: integer } }
+        - { name: maxYear, in: query, schema: { type: integer } }
+        - { name: minPrice, in: query, schema: { type: number } }
+        - { name: maxPrice, in: query, schema: { type: number } }
+        - { name: maxMileage, in: query, schema: { type: integer } }
+        - { name: cityCode, in: query, schema: { type: string } }
+        - { name: negotiable, in: query, schema: { type: boolean } }
+        - { name: featured, in: query, schema: { type: boolean } }
+        - name: attr
+          in: query
+          description: |
+            Filtro por parametros, repetible, en formato `GRUPO:OPCION`.
+            Varias opciones del mismo grupo se combinan con OR; grupos distintos
+            con AND. Ejemplo: `attr=FUEL_TYPE:HYBRID&attr=TRANSMISSION:AUTOMATIC`.
+          schema: { type: array, items: { type: string } }
+          example: ["FUEL_TYPE:HYBRID", "TRANSMISSION:AUTOMATIC"]
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 12, maximum: 100 } }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [publishedAt, priceAmount, modelYear, mileageKm, viewCount, createdAt]
+        - { name: direction, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
+      responses:
+        '200': { description: Pagina de resultados, content: { application/json: { schema: { $ref: '#/components/schemas/ListingPage' } } } }
+    post:
+      tags: [Catalogo]
+      summary: Publicar un vehiculo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaveListingPayload' }
+      responses:
+        '201': { description: Publicacion creada, content: { application/json: { schema: { $ref: '#/components/schemas/ListingDetail' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '422': { description: Reglas de negocio incumplidas (faltan parametros obligatorios, sin imagenes, descripcion corta), content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+
+  /api/v1/listings/featured:
+    get:
+      tags: [Catalogo]
+      summary: Vehiculos destacados
+      security: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 8 } }
+      responses:
+        '200':
+          description: Destacados
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ListingSummary' } }
+
+  /api/v1/listings/mine:
+    get:
+      tags: [Catalogo]
+      summary: Mis publicaciones, en cualquier estado
+      responses:
+        '200': { description: Pagina de resultados, content: { application/json: { schema: { $ref: '#/components/schemas/ListingPage' } } } }
+
+  /api/v1/listings/{slug}:
+    get:
+      tags: [Catalogo]
+      summary: Ficha de un vehiculo
+      description: Registra la visita en el contador de la publicacion.
+      security: []
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string }, example: toyota-corolla-cross-2024 }
+      responses:
+        '200': { description: Ficha completa, content: { application/json: { schema: { $ref: '#/components/schemas/ListingDetail' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /api/v1/listings/{id}/status:
+    patch:
+      tags: [Catalogo]
+      summary: Cambiar el estado de una publicacion
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/ListingStatus' }
+      responses:
+        '200': { description: Estado actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/ListingDetail' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /api/v1/listings/{listingId}/offers:
+    post:
+      tags: [Compra]
+      summary: Enviar una oferta de compra
+      description: La oferta debe ser al menos el 40 % del precio publicado.
+      parameters:
+        - { name: listingId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { type: number, minimum: 1 }
+                currency: { type: string, default: COP }
+                message: { type: string, maxLength: 1000 }
+                contactPhone: { type: string, maxLength: 40 }
+      responses:
+        '201': { description: Oferta registrada, content: { application/json: { schema: { $ref: '#/components/schemas/Offer' } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+    get:
+      tags: [Compra]
+      summary: Ofertas recibidas en una publicacion
+      parameters:
+        - { name: listingId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: Ofertas
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Offer' } }
+
+  /api/v1/offers/sent:
+    get:
+      tags: [Compra]
+      summary: Ofertas que envie
+      responses:
+        '200': { description: Pagina de ofertas }
+
+  /api/v1/offers/received:
+    get:
+      tags: [Compra]
+      summary: Ofertas que recibi como vendedor
+      responses:
+        '200': { description: Pagina de ofertas }
+
+  /api/v1/offers/{offerId}/accept:
+    post:
+      tags: [Compra]
+      summary: Aceptar una oferta
+      description: Reserva el vehiculo y rechaza automaticamente las demas ofertas pendientes.
+      parameters:
+        - { name: offerId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Oferta aceptada, content: { application/json: { schema: { $ref: '#/components/schemas/Offer' } } } }
+
+  /api/v1/offers/{offerId}/reject:
+    post:
+      tags: [Compra]
+      summary: Rechazar una oferta
+      parameters:
+        - { name: offerId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Oferta rechazada, content: { application/json: { schema: { $ref: '#/components/schemas/Offer' } } } }
+
+  /api/v1/offers/{offerId}/withdraw:
+    post:
+      tags: [Compra]
+      summary: Retirar mi oferta
+      parameters:
+        - { name: offerId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Oferta retirada, content: { application/json: { schema: { $ref: '#/components/schemas/Offer' } } } }
+
+  /api/v1/favorites:
+    get:
+      tags: [Compra]
+      summary: Mis favoritos
+      responses:
+        '200':
+          description: Publicaciones guardadas
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ListingSummary' } }
+
+  /api/v1/favorites/{listingId}/toggle:
+    post:
+      tags: [Compra]
+      summary: Agregar o quitar de favoritos
+      parameters:
+        - { name: listingId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: Estado final
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  favorite: { type: boolean }
+
+  /api/v1/news:
+    get:
+      tags: [Noticias]
+      summary: Feed de notas publicadas
+      security: []
+      parameters:
+        - { name: text, in: query, schema: { type: string } }
+        - { name: categoryCode, in: query, schema: { type: string }, example: LAUNCHES }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 12 } }
+      responses:
+        '200': { description: Pagina de notas }
+
+  /api/v1/news/featured:
+    get:
+      tags: [Noticias]
+      summary: Notas destacadas
+      security: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 3 } }
+      responses:
+        '200': { description: Notas destacadas }
+
+  /api/v1/news/tags:
+    get:
+      tags: [Noticias]
+      summary: Etiquetas en uso
+      security: []
+      responses:
+        '200': { description: Etiquetas, content: { application/json: { schema: { type: array, items: { type: string } } } } }
+
+  /api/v1/news/{slug}:
+    get:
+      tags: [Noticias]
+      summary: Leer una nota
+      security: []
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Nota completa, content: { application/json: { schema: { $ref: '#/components/schemas/Article' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /api/v1/news/{slug}/related:
+    get:
+      tags: [Noticias]
+      summary: Notas relacionadas por categoria
+      security: []
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 3 } }
+      responses:
+        '200': { description: Notas relacionadas }
+
+  /api/v1/stats/catalog:
+    get:
+      tags: [Catalogo]
+      summary: Indicadores de la portada
+      security: []
+      responses:
+        '200':
+          description: Indicadores
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  publishedListings: { type: integer, format: int64 }
+                  soldListings: { type: integer, format: int64 }
+                  reservedListings: { type: integer, format: int64 }
+                  brandsWithListings: { type: integer, format: int64 }
+
+  /api/v1/admin/parameters/groups:
+    get:
+      tags: [Administracion]
+      summary: Grupos de parametros, incluidos los inactivos
+      responses:
+        '200': { description: Grupos }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Administracion]
+      summary: Crear un grupo de parametros
+      description: El grupo queda disponible de inmediato en filtros y formularios del cliente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GroupPayload' }
+      responses:
+        '201': { description: Grupo creado, content: { application/json: { schema: { $ref: '#/components/schemas/ParameterGroup' } } } }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /api/v1/admin/parameters/groups/{code}:
+    put:
+      tags: [Administracion]
+      summary: Actualizar un grupo
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GroupPayload' }
+      responses:
+        '200': { description: Grupo actualizado }
+    delete:
+      tags: [Administracion]
+      summary: Eliminar un grupo sin opciones
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Grupo eliminado }
+        '422': { description: El grupo tiene opciones asociadas, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+
+  /api/v1/admin/parameters/groups/{code}/options:
+    post:
+      tags: [Administracion]
+      summary: Crear una opcion
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OptionPayload' }
+      responses:
+        '201': { description: Opcion creada, content: { application/json: { schema: { $ref: '#/components/schemas/ParameterOption' } } } }
+
+  /api/v1/admin/news:
+    get:
+      tags: [Administracion]
+      summary: Notas en cualquier estado
+      responses:
+        '200': { description: Pagina de notas }
+    post:
+      tags: [Administracion]
+      summary: Crear una nota
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaveArticlePayload' }
+      responses:
+        '201': { description: Nota creada, content: { application/json: { schema: { $ref: '#/components/schemas/Article' } } } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Problem:
+      description: Error siguiendo RFC 9457
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code:
+          type: string
+          description: Codigo estable del error, pensado para que el cliente reaccione sin leer el texto.
+          examples: [resource_not_found, invalid_payload, missing_required_parameters, offer_too_low, duplicated_offer, invalid_credentials]
+        timestamp: { type: string, format: date-time }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+    UserRole:
+      type: string
+      enum: [USER, DEALER, ADMIN]
+
+    User:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string, format: email }
+        fullName: { type: string }
+        phone: { type: string }
+        cityCode: { type: string }
+        avatarUrl: { type: string }
+        role: { $ref: '#/components/schemas/UserRole' }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    Session:
+      type: object
+      properties:
+        accessToken: { type: string }
+        tokenType: { type: string, const: Bearer }
+        expiresIn: { type: integer, format: int64, description: Vigencia del token en segundos }
+        user: { $ref: '#/components/schemas/User' }
+
+    RegisterPayload:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email: { type: string, format: email, maxLength: 180 }
+        password: { type: string, minLength: 8, maxLength: 72 }
+        fullName: { type: string, maxLength: 160 }
+        phone: { type: string, maxLength: 40 }
+        cityCode: { type: string, maxLength: 60 }
+        role:
+          allOf: [{ $ref: '#/components/schemas/UserRole' }]
+          description: Se ignora ADMIN; el alta publica solo permite USER o DEALER.
+
+    LoginPayload:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+
+    UpdateProfilePayload:
+      type: object
+      required: [fullName]
+      properties:
+        fullName: { type: string, maxLength: 160 }
+        phone: { type: string, maxLength: 40 }
+        cityCode: { type: string, maxLength: 60 }
+        avatarUrl: { type: string, maxLength: 400 }
+
+    ParameterDataType:
+      type: string
+      enum: [OPTION, TEXT, NUMBER, BOOLEAN]
+      description: Determina como el cliente renderiza el campo y el filtro.
+
+    ParameterScope:
+      type: string
+      enum: [LISTING, NEWS, GENERAL]
+      description: Ambito donde aplica el grupo.
+
+    ParameterOption:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        label: { type: string }
+        iconName: { type: string }
+        colorHex: { type: string }
+        sortOrder: { type: integer }
+        active: { type: boolean }
+
+    ParameterGroup:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string, examples: [FUEL_TYPE] }
+        name: { type: string }
+        description: { type: string }
+        dataType: { $ref: '#/components/schemas/ParameterDataType' }
+        scope: { $ref: '#/components/schemas/ParameterScope' }
+        multiValued: { type: boolean, description: Solo para grupos OPTION; permite varios valores por publicacion. }
+        filterable: { type: boolean, description: Si aparece como filtro en la busqueda. }
+        requiredForListing: { type: boolean, description: Si es obligatorio para publicar. }
+        showInSpecs: { type: boolean, description: Si aparece en la ficha tecnica. }
+        sortOrder: { type: integer }
+        active: { type: boolean }
+        options:
+          type: array
+          items: { $ref: '#/components/schemas/ParameterOption' }
+
+    GroupPayload:
+      type: object
+      required: [code, name, dataType]
+      properties:
+        code: { type: string, maxLength: 40, pattern: '^[A-Z][A-Z0-9_]{1,39}$' }
+        name: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 400 }
+        dataType: { $ref: '#/components/schemas/ParameterDataType' }
+        scope: { $ref: '#/components/schemas/ParameterScope' }
+        multiValued: { type: boolean, default: false }
+        filterable: { type: boolean, default: false }
+        requiredForListing: { type: boolean, default: false }
+        showInSpecs: { type: boolean, default: false }
+        sortOrder: { type: integer }
+        active: { type: boolean, default: true }
+
+    OptionPayload:
+      type: object
+      required: [code, label]
+      properties:
+        code: { type: string, maxLength: 60 }
+        label: { type: string, maxLength: 120 }
+        iconName: { type: string, maxLength: 60 }
+        colorHex: { type: string, pattern: '^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$' }
+        sortOrder: { type: integer }
+        active: { type: boolean, default: true }
+
+    VehicleModel:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        brandId: { type: integer, format: int64 }
+        brandName: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        bodyTypeCode: { type: string }
+        active: { type: boolean }
+
+    Brand:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        slug: { type: string }
+        countryOfOrigin: { type: string }
+        logoUrl: { type: string }
+        active: { type: boolean }
+        modelCount: { type: integer }
+        models:
+          type: array
+          items: { $ref: '#/components/schemas/VehicleModel' }
+
+    ListingStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, RESERVED, SOLD, ARCHIVED]
+
+    ListingSummary:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        reference: { type: string, examples: [CAMS-D0001] }
+        slug: { type: string }
+        title: { type: string }
+        brandId: { type: integer, format: int64 }
+        brandName: { type: string }
+        modelId: { type: integer, format: int64 }
+        modelName: { type: string }
+        year: { type: integer }
+        mileageKm: { type: integer }
+        price: { type: number }
+        currency: { type: string }
+        negotiable: { type: boolean }
+        cityCode: { type: string }
+        status: { $ref: '#/components/schemas/ListingStatus' }
+        featured: { type: boolean }
+        viewCount: { type: integer, format: int64 }
+        coverImageUrl: { type: string }
+        sellerName: { type: string }
+        publishedAt: { type: string, format: date-time }
+
+    ListingAttribute:
+      type: object
+      description: Valor de un parametro aplicado a la publicacion.
+      properties:
+        groupCode: { type: string }
+        optionCode: { type: string }
+        textValue: { type: string }
+        numberValue: { type: number }
+        boolValue: { type: boolean }
+        displayValue: { type: string }
+
+    ListingDetail:
+      allOf:
+        - $ref: '#/components/schemas/ListingSummary'
+        - type: object
+          properties:
+            sellerId: { type: integer, format: int64 }
+            description: { type: string }
+            favorite: { type: boolean }
+            favoriteCount: { type: integer, format: int64 }
+            createdAt: { type: string, format: date-time }
+            images:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: integer, format: int64 }
+                  url: { type: string }
+                  alt: { type: string }
+                  position: { type: integer }
+            attributes:
+              type: array
+              items: { $ref: '#/components/schemas/ListingAttribute' }
+
+    ListingPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/ListingSummary' }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+        first: { type: boolean }
+        last: { type: boolean }
+
+    SaveListingPayload:
+      type: object
+      required: [modelId, year, mileageKm, price, description]
+      properties:
+        brandId: { type: integer, format: int64, description: Opcional; se valida contra la marca del modelo. }
+        modelId: { type: integer, format: int64 }
+        title: { type: string, maxLength: 200, description: Si se omite se arma con marca, modelo y ano. }
+        year: { type: integer, minimum: 1900, maximum: 2100 }
+        mileageKm: { type: integer, minimum: 0, maximum: 2000000 }
+        price: { type: number, minimum: 1 }
+        currency: { type: string, default: COP }
+        negotiable: { type: boolean, default: false }
+        description: { type: string, maxLength: 6000, description: Minimo 40 caracteres para publicar. }
+        cityCode: { type: string, maxLength: 60 }
+        publishNow:
+          type: boolean
+          default: false
+          description: Con true se valida y queda PUBLISHED; con false queda DRAFT.
+        images:
+          type: array
+          items:
+            type: object
+            required: [url]
+            properties:
+              url: { type: string, maxLength: 500 }
+              alt: { type: string, maxLength: 200 }
+              position: { type: integer }
+        attributes:
+          type: array
+          description: Valores de los grupos de parametros con ambito LISTING o GENERAL.
+          items:
+            type: object
+            required: [groupCode]
+            properties:
+              groupCode: { type: string }
+              optionCode: { type: string, description: Para grupos OPTION. }
+              textValue: { type: string, description: Para grupos TEXT. }
+              numberValue: { type: number, description: Para grupos NUMBER. }
+              boolValue: { type: boolean, description: Para grupos BOOLEAN. }
+
+    OfferStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, REJECTED, WITHDRAWN]
+
+    Offer:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        listingId: { type: integer, format: int64 }
+        listingReference: { type: string }
+        listingTitle: { type: string }
+        sellerId: { type: integer, format: int64 }
+        buyerId: { type: integer, format: int64 }
+        buyerName: { type: string }
+        buyerPhone: { type: string }
+        amount: { type: number }
+        currency: { type: string }
+        message: { type: string }
+        status: { $ref: '#/components/schemas/OfferStatus' }
+        createdAt: { type: string, format: date-time }
+        respondedAt: { type: string, format: date-time }
+
+    ArticleStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, ARCHIVED]
+
+    Article:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        slug: { type: string }
+        title: { type: string }
+        excerpt: { type: string }
+        body: { type: string }
+        coverImageUrl: { type: string }
+        categoryCode: { type: string, description: Opcion del grupo de parametros NEWS_CATEGORY. }
+        tags: { type: array, items: { type: string } }
+        authorId: { type: integer, format: int64 }
+        authorName: { type: string }
+        status: { $ref: '#/components/schemas/ArticleStatus' }
+        featured: { type: boolean }
+        readingMinutes: { type: integer, description: Estimado a 200 palabras por minuto. }
+        viewCount: { type: integer, format: int64 }
+        publishedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+
+    SaveArticlePayload:
+      type: object
+      required: [title, body]
+      properties:
+        title: { type: string, maxLength: 200 }
+        excerpt: { type: string, maxLength: 500 }
+        body: { type: string, maxLength: 20000, description: Minimo 200 caracteres para publicar. }
+        coverImageUrl: { type: string, maxLength: 500, description: Obligatorio para publicar. }
+        categoryCode: { type: string, maxLength: 60 }
+        tags: { type: array, items: { type: string }, maxItems: 8 }
+        featured: { type: boolean, default: false }
+        publishNow: { type: boolean, default: false }
+
+security:
+  - bearerAuth: []
