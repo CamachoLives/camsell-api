@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: camsell-postgres
+    environment:
+      POSTGRES_DB: camsell
+      POSTGRES_USER: camsell
+      POSTGRES_PASSWORD: ${CAMSELL_DB_PASSWORD:-camsell}
+    ports:
+      - "5432:5432"
+    volumes:
+      - camsell-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U camsell -d camsell"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: camsell-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CAMSELL_PROFILE: prod
+      CAMSELL_DB_URL: jdbc:postgresql://postgres:5432/camsell
+      CAMSELL_DB_USER: camsell
+      CAMSELL_DB_PASSWORD: ${CAMSELL_DB_PASSWORD:-camsell}
+      CAMSELL_JWT_SECRET: ${CAMSELL_JWT_SECRET:-camsell-local-dev-secret-please-rotate-in-production-0001}
+      CAMSELL_DEMO_DATA: "true"
+    ports:
+      - "8080:8080"
+
+volumes:
+  camsell-pgdata:
