@@ -31,6 +31,20 @@ server:
   error:
     include-message: never
     include-stacktrace: never
+  # El JSON del catalogo comprime muy bien; en una busqueda tipica baja de
+  # decenas de kilobytes a unos pocos.
+  compression:
+    enabled: true
+    mime-types: application/json,application/problem+json,application/yaml,text/plain
+    min-response-size: 1KB
+  http2:
+    enabled: true
+  tomcat:
+    threads:
+      max: 100
+    max-http-form-post-size: 256KB
+    max-swallow-size: 2MB
+    connection-timeout: 20s
 
 management:
   endpoints:

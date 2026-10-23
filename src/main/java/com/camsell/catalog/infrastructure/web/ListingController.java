@@ -7,8 +7,10 @@ import com.camsell.catalog.domain.port.in.FavoriteUseCase;
 import com.camsell.catalog.domain.port.in.ListingQueryUseCase;
 import com.camsell.catalog.domain.port.out.FavoriteRepositoryPort;
 import com.camsell.catalog.infrastructure.web.dto.ListingResponses;
+import com.camsell.shared.api.CachePolicy;
 import com.camsell.shared.api.dto.PageResponse;
 import com.camsell.shared.domain.page.PageQuery;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,7 +50,7 @@ public class ListingController {
     }
 
     @GetMapping
-    public PageResponse<ListingResponses.Summary> search(
+    public ResponseEntity<PageResponse<ListingResponses.Summary>> search(
             @RequestParam(required = false) String text,
             @RequestParam(required = false) List<Long> brandIds,
             @RequestParam(required = false) List<Long> modelIds,
@@ -82,23 +84,34 @@ public class ListingController {
                 negotiable,
                 parseAttributeFilters(attr));
 
-        return PageResponse.from(listings
-                .search(query, PageQuery.of(page, size, sort, direction))
-                .map(ListingResponses.Summary::from));
+        return CachePolicy.publicResponse(
+                PageResponse.from(listings
+                        .search(query, PageQuery.of(page, size, sort, direction))
+                        .map(ListingResponses.Summary::from)),
+                CachePolicy.FEED);
     }
 
     @GetMapping("/featured")
-    public List<ListingResponses.Summary> featured(@RequestParam(defaultValue = "8") int limit) {
-        return listings.featured(limit).stream().map(ListingResponses.Summary::from).toList();
+    public ResponseEntity<List<ListingResponses.Summary>> featured(
+            @RequestParam(defaultValue = "8") int limit) {
+        return CachePolicy.publicResponse(
+                listings.featured(limit).stream().map(ListingResponses.Summary::from).toList(),
+                CachePolicy.FEED);
     }
 
+    /**
+     * La ficha incluye si el usuario actual la guardo en favoritos, por lo que
+     * la respuesta varia entre personas y no se puede cachear en intermediarios.
+     */
     @GetMapping("/{slug}")
-    public ListingResponses.Detail detail(@PathVariable String slug) {
+    public ResponseEntity<ListingResponses.Detail> detail(@PathVariable String slug) {
         Listing listing = listings.getBySlug(slug);
-        return ListingResponses.Detail.from(
-                listing,
-                favorites.isFavorite(listing.id()),
-                favoriteCounts.countByListing(listing.id()));
+        return CachePolicy.publicResponse(
+                ListingResponses.Detail.from(
+                        listing,
+                        favorites.isFavorite(listing.id()),
+                        favoriteCounts.countByListing(listing.id())),
+                CachePolicy.PRIVATE);
     }
 
     /** Convierte {@code GRUPO:OPCION} repetido en el mapa de filtros del dominio. */

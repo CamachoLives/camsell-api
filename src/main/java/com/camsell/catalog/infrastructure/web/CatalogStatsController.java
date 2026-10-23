@@ -1,6 +1,8 @@
 package com.camsell.catalog.infrastructure.web;
 
 import com.camsell.catalog.domain.port.in.ListingQueryUseCase;
+import com.camsell.shared.api.CachePolicy;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,7 +19,7 @@ public class CatalogStatsController {
     }
 
     @GetMapping("/catalog")
-    public ListingQueryUseCase.CatalogStats catalog() {
-        return listings.stats();
+    public ResponseEntity<ListingQueryUseCase.CatalogStats> catalog() {
+        return CachePolicy.publicResponse(listings.stats(), CachePolicy.FEED);
     }
 }

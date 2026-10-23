@@ -1,6 +1,8 @@
 package com.camsell.architecture;
 
 import com.camsell.CamsellApplication;
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -44,10 +46,20 @@ class HexagonalArchitectureTest {
                     "..infrastructure.web..", "..infrastructure.persistence..")
             .because("los servicios de aplicacion solo hablan con puertos");
 
+    /**
+     * El nombre por si solo no alcanza: {@code ResponseEntity} de Spring
+     * tambien termina en "Entity". La regla apunta a las entidades JPA, que son
+     * las que viven en el paquete de persistencia.
+     */
+    private static final DescribedPredicate<JavaClass> ENTIDADES_JPA =
+            JavaClass.Predicates.resideInAPackage("..infrastructure.persistence..")
+                    .and(JavaClass.Predicates.simpleNameEndingWith("Entity"))
+                    .as("entidades JPA del paquete de persistencia");
+
     @ArchTest
     static final ArchRule las_entidades_jpa_no_salen_de_persistencia = noClasses()
             .that().resideOutsideOfPackage("..infrastructure.persistence..")
-            .should().dependOnClassesThat().haveSimpleNameEndingWith("Entity")
+            .should().dependOnClassesThat(ENTIDADES_JPA)
             .because("las entidades JPA no deben filtrarse hacia el dominio ni hacia la API");
 
     @ArchTest

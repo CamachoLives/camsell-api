@@ -4,6 +4,7 @@ import com.camsell.parameters.domain.port.in.ParameterAdminUseCase;
 import com.camsell.parameters.domain.port.in.ParameterQueryUseCase;
 import com.camsell.parameters.infrastructure.web.dto.ParameterGroupResponse;
 import com.camsell.parameters.infrastructure.web.dto.ParameterPayloads;
+import com.camsell.shared.api.ResourceVersions;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,10 +28,22 @@ public class ParameterAdminController {
 
     private final ParameterAdminUseCase admin;
     private final ParameterQueryUseCase query;
+    private final ResourceVersions versions;
 
-    public ParameterAdminController(ParameterAdminUseCase admin, ParameterQueryUseCase query) {
+    public ParameterAdminController(
+            ParameterAdminUseCase admin, ParameterQueryUseCase query, ResourceVersions versions) {
         this.admin = admin;
         this.query = query;
+        this.versions = versions;
+    }
+
+    /**
+     * Invalida el ETag del esquema publico. Recibe el resultado ya calculado,
+     * de modo que una escritura que falla no invalida la cache.
+     */
+    private <T> T afterWrite(T result) {
+        versions.bump(ResourceVersions.Family.PARAMETERS);
+        return result;
     }
 
     @GetMapping("/groups")
@@ -41,40 +54,43 @@ public class ParameterAdminController {
     @PostMapping("/groups")
     @ResponseStatus(HttpStatus.CREATED)
     public ParameterGroupResponse createGroup(@Valid @RequestBody ParameterPayloads.GroupPayload payload) {
-        return ParameterGroupResponse.from(admin.createGroup(new ParameterAdminUseCase.CreateGroupCommand(
-                payload.code(),
-                payload.name(),
-                payload.description(),
-                payload.dataType(),
-                payload.scopeOrDefault(),
-                payload.multiValued(),
-                payload.filterable(),
-                payload.requiredForListing(),
-                payload.showInSpecs(),
-                payload.sortOrder())));
+        return afterWrite(ParameterGroupResponse.from(
+                admin.createGroup(new ParameterAdminUseCase.CreateGroupCommand(
+                        payload.code(),
+                        payload.name(),
+                        payload.description(),
+                        payload.dataType(),
+                        payload.scopeOrDefault(),
+                        payload.multiValued(),
+                        payload.filterable(),
+                        payload.requiredForListing(),
+                        payload.showInSpecs(),
+                        payload.sortOrder()))));
     }
 
     @PutMapping("/groups/{code}")
     public ParameterGroupResponse updateGroup(
             @PathVariable String code,
             @Valid @RequestBody ParameterPayloads.GroupPayload payload) {
-        return ParameterGroupResponse.from(admin.updateGroup(code, new ParameterAdminUseCase.UpdateGroupCommand(
-                payload.name(),
-                payload.description(),
-                payload.dataType(),
-                payload.scopeOrDefault(),
-                payload.multiValued(),
-                payload.filterable(),
-                payload.requiredForListing(),
-                payload.showInSpecs(),
-                payload.sortOrder(),
-                payload.activeOrDefault())));
+        return afterWrite(ParameterGroupResponse.from(
+                admin.updateGroup(code, new ParameterAdminUseCase.UpdateGroupCommand(
+                        payload.name(),
+                        payload.description(),
+                        payload.dataType(),
+                        payload.scopeOrDefault(),
+                        payload.multiValued(),
+                        payload.filterable(),
+                        payload.requiredForListing(),
+                        payload.showInSpecs(),
+                        payload.sortOrder(),
+                        payload.activeOrDefault()))));
     }
 
     @DeleteMapping("/groups/{code}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteGroup(@PathVariable String code) {
         admin.deleteGroup(code);
+        afterWrite(null);
     }
 
     @PostMapping("/groups/{code}/options")
@@ -82,7 +98,8 @@ public class ParameterAdminController {
     public ParameterGroupResponse.Option createOption(
             @PathVariable String code,
             @Valid @RequestBody ParameterPayloads.OptionPayload payload) {
-        return ParameterGroupResponse.Option.from(admin.createOption(code, toCommand(payload)));
+        return afterWrite(
+                ParameterGroupResponse.Option.from(admin.createOption(code, toCommand(payload))));
     }
 
     @PutMapping("/groups/{code}/options/{optionId}")
@@ -90,13 +107,15 @@ public class ParameterAdminController {
             @PathVariable String code,
             @PathVariable Long optionId,
             @Valid @RequestBody ParameterPayloads.OptionPayload payload) {
-        return ParameterGroupResponse.Option.from(admin.updateOption(code, optionId, toCommand(payload)));
+        return afterWrite(ParameterGroupResponse.Option.from(
+                admin.updateOption(code, optionId, toCommand(payload))));
     }
 
     @DeleteMapping("/groups/{code}/options/{optionId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteOption(@PathVariable String code, @PathVariable Long optionId) {
         admin.deleteOption(code, optionId);
+        afterWrite(null);
     }
 
     private ParameterAdminUseCase.SaveOptionCommand toCommand(ParameterPayloads.OptionPayload payload) {
