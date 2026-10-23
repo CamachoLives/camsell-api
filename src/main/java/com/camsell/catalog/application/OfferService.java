@@ -15,6 +15,7 @@ import com.camsell.shared.domain.exception.OperationNotAllowedException;
 import com.camsell.shared.domain.exception.ResourceNotFoundException;
 import com.camsell.shared.domain.page.PageQuery;
 import com.camsell.shared.domain.page.PageResult;
+import io.micrometer.core.annotation.Counted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,7 @@ public class OfferService implements OfferUseCase {
     }
 
     @Override
+    @Counted(value = "camsell.offers.submitted", description = "Ofertas de compra enviadas")
     public Offer submit(Long listingId, SubmitOfferCommand command) {
         Long buyerId = currentUser.requireCurrentUserId();
         Listing listing = listings.findById(listingId)
@@ -123,6 +125,7 @@ public class OfferService implements OfferUseCase {
     }
 
     @Override
+    @Counted(value = "camsell.offers.accepted", description = "Ofertas aceptadas por el vendedor")
     public Offer accept(Long offerId) {
         Offer offer = requireSellerAccess(offerId);
         Offer accepted = offers.save(offer.transitionTo(OfferStatus.ACCEPTED, Instant.now()));

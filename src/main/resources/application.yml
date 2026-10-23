@@ -47,16 +47,44 @@ server:
     connection-timeout: 20s
 
 management:
+  server:
+    # Las metricas describen el comportamiento interno del sistema; viven en un
+    # puerto aparte que no se publica hacia afuera.
+    port: ${CAMSELL_MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: true
   info:
     env:
       enabled: true
+    java:
+      enabled: true
+  metrics:
+    tags:
+      application: camsell-api
+    distribution:
+      # Se publican buckets y no percentiles ya calculados: Prometheus los
+      # agrega entre instancias con histogram_quantile, mientras que un
+      # percentil calculado en cada proceso no se puede promediar. Una media
+      # esconde justamente las peticiones que hacen sentir lento el sitio.
+      percentiles-histogram:
+        http.server.requests: true
+        camsell.catalog.search: true
+      slo:
+        http.server.requests: 100ms, 300ms, 800ms
+  observations:
+    key-values:
+      application: camsell-api
+  prometheus:
+    metrics:
+      export:
+        enabled: true
 
 camsell:
   rate-limit:
@@ -113,6 +141,13 @@ camsell:
     enabled: ${CAMSELL_DEMO_DATA:true}
 
 ---
+# En produccion los logs van a un agregador, no a una consola humana: el
+# formato ECS los deja indexables y conserva el requestId del MDC como campo.
+logging:
+  structured:
+    format:
+      console: ecs
+
 spring:
   config:
     activate:

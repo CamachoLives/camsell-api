@@ -8,6 +8,7 @@ import com.camsell.identity.domain.port.out.TokenIssuerPort;
 import com.camsell.identity.domain.port.out.UserRepositoryPort;
 import com.camsell.shared.domain.exception.BusinessRuleException;
 import com.camsell.shared.domain.exception.DuplicatedResourceException;
+import io.micrometer.core.annotation.Counted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class AuthenticationService implements AuthenticationUseCase {
     }
 
     @Override
+    @Counted(value = "camsell.auth.registrations", description = "Cuentas creadas")
     public AuthenticatedSession register(RegisterCommand command) {
         String email = normalizeEmail(command.email());
         if (users.existsByEmail(email)) {
@@ -59,6 +61,9 @@ public class AuthenticationService implements AuthenticationUseCase {
 
     @Override
     @Transactional(readOnly = true)
+    // recordFailuresOnly esta en false para poder comparar exitos contra fallos
+    // y detectar un intento de fuerza bruta en las metricas.
+    @Counted(value = "camsell.auth.logins", description = "Intentos de inicio de sesion")
     public AuthenticatedSession login(LoginCommand command) {
         String email = normalizeEmail(command.email());
         User user = users.findByEmail(email)

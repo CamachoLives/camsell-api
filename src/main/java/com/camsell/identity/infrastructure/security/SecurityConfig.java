@@ -45,8 +45,6 @@ public class SecurityConfig {
             "/api/v1/listings/**",
             "/api/v1/news/**",
             "/api/v1/stats/**",
-            "/actuator/health",
-            "/actuator/info",
             "/openapi.yaml"
     };
 

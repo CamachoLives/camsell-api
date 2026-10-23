@@ -12,6 +12,7 @@ import com.camsell.shared.domain.exception.OperationNotAllowedException;
 import com.camsell.shared.domain.exception.ResourceNotFoundException;
 import com.camsell.shared.domain.page.PageQuery;
 import com.camsell.shared.domain.page.PageResult;
+import io.micrometer.core.annotation.Timed;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +37,7 @@ public class ListingQueryService implements ListingQueryUseCase {
     }
 
     @Override
+    @Timed(value = "camsell.catalog.search", description = "Latencia de la busqueda del catalogo")
     public PageResult<ListingCard> search(ListingSearchQuery query, PageQuery page) {
         return listings.search(query, page);
     }

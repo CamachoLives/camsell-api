@@ -22,9 +22,10 @@ USER camsell
 
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+UseG1GC"
 ENV CAMSELL_PROFILE=prod
-EXPOSE 8080
+# 8080 es la API; 8081 es el puerto de gestion, que no se publica hacia afuera.
+EXPOSE 8080 8081
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1
+    CMD wget -qO- http://localhost:8081/actuator/health/readiness | grep -q UP || exit 1
 
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

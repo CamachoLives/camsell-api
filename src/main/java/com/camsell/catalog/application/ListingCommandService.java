@@ -18,6 +18,7 @@ import com.camsell.shared.domain.exception.BusinessRuleException;
 import com.camsell.shared.domain.exception.OperationNotAllowedException;
 import com.camsell.shared.domain.exception.ResourceNotFoundException;
 import com.camsell.shared.domain.util.Slugs;
+import io.micrometer.core.annotation.Counted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -69,6 +70,7 @@ public class ListingCommandService implements ListingCommandUseCase {
     }
 
     @Override
+    @Counted(value = "camsell.listings.created", description = "Publicaciones creadas")
     public Listing create(SaveListingCommand command) {
         Long sellerId = currentUser.requireCurrentUserId();
         SellerLookupPort.SellerInfo seller = sellers.findSeller(sellerId);
@@ -158,6 +160,7 @@ public class ListingCommandService implements ListingCommandUseCase {
     }
 
     @Override
+    @Counted(value = "camsell.listings.status_changed", description = "Cambios de estado de publicaciones")
     public Listing changeStatus(Long id, ListingStatus status) {
         Listing current = requireManageable(id);
         if (status.isPubliclyVisible()) {
