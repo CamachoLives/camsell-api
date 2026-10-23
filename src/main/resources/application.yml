@@ -59,6 +59,12 @@ management:
       enabled: true
 
 camsell:
+  rate-limit:
+    enabled: ${CAMSELL_RATE_LIMIT:true}
+    # Frena la fuerza bruta contra el inicio de sesion sin estorbar a una
+    # persona que se equivoca de clave un par de veces.
+    credential-attempts-per-minute: 10
+    writes-per-minute: 60
   demo-data:
     enabled: ${CAMSELL_DEMO_DATA:false}
   jwt:

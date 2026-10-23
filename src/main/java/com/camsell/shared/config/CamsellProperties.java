@@ -10,7 +10,11 @@ import java.util.List;
  * variable de entorno en despliegue.
  */
 @ConfigurationProperties(prefix = "camsell")
-public record CamsellProperties(Jwt jwt, Cors cors, Catalog catalog) {
+public record CamsellProperties(Jwt jwt, Cors cors, Catalog catalog, RateLimit rateLimit) {
+
+    public CamsellProperties {
+        rateLimit = rateLimit == null ? RateLimit.defaults() : rateLimit;
+    }
 
     public record Jwt(String secret, String issuer, Duration accessTokenTtl) {
     }
@@ -20,5 +24,19 @@ public record CamsellProperties(Jwt jwt, Cors cors, Catalog catalog) {
 
     /** Limites parametrizables del catalogo, ajustables sin recompilar. */
     public record Catalog(int maxImagesPerListing, int maxFeaturedListings, int minYear) {
+    }
+
+    /**
+     * Cuotas de peticiones por cliente. Las credenciales tienen una cuota
+     * aparte, mucho mas estrecha, para frenar la fuerza bruta.
+     */
+    public record RateLimit(
+            boolean enabled,
+            int credentialAttemptsPerMinute,
+            int writesPerMinute) {
+
+        public static RateLimit defaults() {
+            return new RateLimit(true, 10, 60);
+        }
     }
 }

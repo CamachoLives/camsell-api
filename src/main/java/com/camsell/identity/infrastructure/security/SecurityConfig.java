@@ -10,6 +10,9 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy;
+import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -24,6 +27,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 /**
  * Seguridad stateless basada en JWT firmado con HMAC-SHA256. La API se
@@ -90,7 +94,28 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
+                .headers(headers -> headers
+                        // La consola H2 de desarrollo se embebe en un marco del
+                        // mismo origen; nada mas puede enmarcar la API.
+                        .frameOptions(frame -> frame.sameOrigin())
+                        .contentTypeOptions(Customizer.withDefaults())
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(Duration.ofDays(365).toSeconds()))
+                        .referrerPolicy(referrer -> referrer
+                                .policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .crossOriginOpenerPolicy(coop -> coop
+                                .policy(CrossOriginOpenerPolicy.SAME_ORIGIN))
+                        .crossOriginResourcePolicy(corp -> corp
+                                .policy(CrossOriginResourcePolicy.SAME_SITE))
+                        // La API devuelve JSON, no documentos: una politica
+                        // restrictiva evita que una respuesta reflejada se
+                        // interprete como pagina con scripts.
+                        .contentSecurityPolicy(csp -> csp
+                                .policyDirectives("default-src 'none'; frame-ancestors 'self'; "
+                                        + "base-uri 'none'; form-action 'none'"))
+                        .permissionsPolicyHeader(permissions -> permissions
+                                .policy("camera=(), microphone=(), geolocation=(), payment=()")))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_GET).permitAll()
