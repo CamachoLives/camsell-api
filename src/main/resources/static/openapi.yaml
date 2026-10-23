@@ -14,6 +14,19 @@ info:
     **Errores.** Todas las respuestas de error siguen RFC 9457 (`ProblemDetail`)
     e incluyen un campo `code` estable para que el cliente reaccione sin
     interpretar textos.
+
+    **Caché.** Las lecturas públicas llevan `Cache-Control` explícito según el
+    tipo de recurso: la configuración se cachea cinco minutos y además se
+    revalida con `ETag` (envía `If-None-Match` y recibe `304` sin cuerpo); los
+    feeds usan una ventana corta de treinta segundos; la ficha del vehículo no
+    se cachea porque incluye si el usuario la guardó en favoritos. Las
+    respuestas se comprimen con gzip desde 1 KB.
+
+    **Límite de tasa.** Las escrituras tienen cuota por cliente y responden
+    `429` con `Retry-After` al superarla. Las lecturas no se limitan.
+
+    **Operación.** Los endpoints de actuator no viven en este puerto: corren en
+    un puerto de gestión aparte que no se publica hacia internet.
   license:
     name: MIT
 servers:
@@ -44,6 +57,7 @@ paths:
         '201': { description: Cuenta creada, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /api/v1/auth/login:
     post:
@@ -58,6 +72,7 @@ paths:
       responses:
         '200': { description: Sesion iniciada, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
         '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /api/v1/auth/me:
     get:
@@ -532,6 +547,19 @@ components:
   responses:
     Problem:
       description: Error siguiendo RFC 9457
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+    RateLimited:
+      description: >
+        Se superó la cuota de peticiones. El inicio de sesión, el registro y el
+        cambio de clave comparten una cuota estrecha por cliente; las demás
+        escrituras una más holgada. Las lecturas no se limitan.
+      headers:
+        Retry-After:
+          description: Segundos que conviene esperar antes de reintentar.
+          schema: { type: integer }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }

@@ -56,6 +56,68 @@ infrastructure/
 - Los contextos se comunican solo por `domain.port`, nunca por entidades JPA.
 - Solo `identity.infrastructure.security` lee el `SecurityContext` de Spring.
 
+### Rendimiento
+
+Las decisiones de rendimiento están medidas, no supuestas.
+
+| Qué | Antes | Después |
+|---|---|---|
+| Esquema de parámetros por la red | 9.241 B | **2.273 B** (gzip) |
+| Árbol de marcas | 4.304 B | **834 B** (gzip) |
+| Página de 50 publicaciones | 6.665 B | **1.340 B** (gzip) |
+| Revalidación con ETag | — | **0 B** (304) |
+| Consultas por página del catálogo | 25 (12 resultados) | **≤ 3, constantes** |
+
+- **Modelo de lectura separado.** Una búsqueda devuelve `ListingCard`, que trae
+  solo lo que pinta una tarjeta. Mapear el agregado completo obligaba a resolver
+  dos colecciones perezosas por resultado; la tarjeta toca únicamente la
+  portada. [`ListingQueryCountTest`](src/test/java/com/camsell/catalog/ListingQueryCountTest.java)
+  mide el coste con las estadísticas de Hibernate y exige que una página de
+  cuatro y una de doce resultados cuesten lo mismo — que es lo que distingue un
+  coste constante de un N+1.
+- **ETag por versión de recurso, no por hash del cuerpo.**
+  `ShallowEtagHeaderFilter` se descartó: almacena la respuesta en memoria para
+  hashearla y, al fijar `Content-Length`, impide que el contenedor la comprima.
+  Con un contador por familia el ETag se conoce antes de consultar la base de
+  datos, así que un 304 no serializa nada. El ETag es **débil** a propósito:
+  Tomcat no comprime respuestas con ETag fuerte porque gzip cambiaría los bytes
+  que ese ETag identifica.
+- **Caché con vencimiento y métricas.** Caffeine con TTL de 10 minutos y tope de
+  500 entradas, en lugar de un mapa que crecía sin límite y no reportaba nada.
+  Los aciertos y fallos se publican como métricas.
+
+### Operación
+
+- **Puerto de gestión separado (8081).** Actuator no se expone en el puerto
+  público: las métricas describen el funcionamiento interno del sistema. El
+  orquestador consulta `/actuator/health/readiness` y Prometheus recolecta desde
+  dentro de la red del despliegue.
+- **Métricas de negocio.** Publicaciones creadas, cambios de estado, ofertas
+  enviadas y aceptadas, registros e inicios de sesión — este último con la
+  etiqueta de resultado, de modo que comparar éxitos contra fallos deja ver un
+  intento de fuerza bruta en el tablero.
+- **Latencia con histograma** y umbrales de SLO en 100, 300 y 800 ms. Se
+  publican buckets y no percentiles ya calculados, porque Prometheus los agrega
+  entre instancias con `histogram_quantile` mientras que un percentil calculado
+  en cada proceso no se puede promediar.
+- **Peticiones lentas visibles.** Las que superan 800 ms se registran en `WARN`
+  con su `X-Request-Id` y alimentan un contador.
+- **Logs estructurados** en formato ECS en el perfil `prod`, para que el
+  identificador de correlación sea un campo indexable y no texto dentro de la
+  línea.
+
+### Seguridad
+
+- **Límite de tasa por cliente.** El inicio de sesión, el registro y el cambio
+  de clave comparten una cuota estrecha (10/min); las escrituras una más holgada
+  (60/min). La cubeta de tokens se recarga de forma proporcional al tiempo
+  transcurrido y no por ventanas fijas, para que nadie gaste el doble de la
+  cuota a caballo entre dos ventanas. Al frenar se responde 429 con
+  `Retry-After`.
+- **Cabeceras de endurecimiento.** HSTS con subdominios, `nosniff`,
+  `Referrer-Policy`, COOP, CORP, `Permissions-Policy` y una CSP con
+  `default-src 'none'`: la API devuelve JSON, no documentos.
+
 ### Decisiones de diseño
 
 - **Paginación de dominio.** `PageQuery`/`PageResult` mantienen `Pageable` y
@@ -100,7 +162,9 @@ mvn spring-boot:run
 
 - API: <http://localhost:8080/api/v1>
 - Consola H2: <http://localhost:8080/h2-console> (JDBC `jdbc:h2:mem:camsell`, usuario `sa`, sin clave)
-- Salud: <http://localhost:8080/actuator/health>
+- Salud y métricas: <http://localhost:8081/actuator/health> — actuator corre en
+  un **puerto de gestión aparte**, que no se publica hacia internet
+- Prometheus: <http://localhost:8081/actuator/prometheus>
 
 El perfil `dev` carga datos de demostración en el primer arranque.
 
@@ -115,7 +179,9 @@ docker compose up --build
 | Variable | Default | Descripción |
 |---|---|---|
 | `CAMSELL_PROFILE` | `dev` | Perfil activo (`dev` \| `prod`) |
-| `CAMSELL_PORT` | `8080` | Puerto HTTP |
+| `CAMSELL_PORT` | `8080` | Puerto HTTP de la API |
+| `CAMSELL_MANAGEMENT_PORT` | `8081` | Puerto de actuator. **No publicarlo hacia internet** |
+| `CAMSELL_RATE_LIMIT` | `true` | Activa el límite de tasa por cliente |
 | `CAMSELL_JWT_SECRET` | secreto de desarrollo | **Rotar en producción.** Mínimo 32 bytes |
 | `CAMSELL_DB_URL` | `jdbc:postgresql://localhost:5432/camsell` | Solo perfil `prod` |
 | `CAMSELL_DB_USER` / `CAMSELL_DB_PASSWORD` | `camsell` | Solo perfil `prod` |
