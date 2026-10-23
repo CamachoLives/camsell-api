@@ -1,6 +1,7 @@
 package com.camsell.catalog.infrastructure.web.dto;
 
 import com.camsell.catalog.domain.model.Listing;
+import com.camsell.catalog.domain.model.ListingCard;
 import com.camsell.catalog.domain.model.ListingStatus;
 
 import java.math.BigDecimal;
@@ -36,28 +37,28 @@ public final class ListingResponses {
             String sellerName,
             Instant publishedAt) {
 
-        public static Summary from(Listing listing) {
+        public static Summary from(ListingCard card) {
             return new Summary(
-                    listing.id(),
-                    listing.reference(),
-                    listing.slug(),
-                    listing.title(),
-                    listing.brandId(),
-                    listing.brandName(),
-                    listing.modelId(),
-                    listing.modelName(),
-                    listing.year(),
-                    listing.mileageKm(),
-                    listing.price().amount(),
-                    listing.price().currency(),
-                    listing.negotiable(),
-                    listing.cityCode(),
-                    listing.status(),
-                    listing.featured(),
-                    listing.viewCount(),
-                    listing.coverImage() == null ? null : listing.coverImage().url(),
-                    listing.sellerName(),
-                    listing.publishedAt());
+                    card.id(),
+                    card.reference(),
+                    card.slug(),
+                    card.title(),
+                    card.brandId(),
+                    card.brandName(),
+                    card.modelId(),
+                    card.modelName(),
+                    card.year(),
+                    card.mileageKm(),
+                    card.price().amount(),
+                    card.price().currency(),
+                    card.negotiable(),
+                    card.cityCode(),
+                    card.status(),
+                    card.featured(),
+                    card.viewCount(),
+                    card.coverImageUrl(),
+                    card.sellerName(),
+                    card.publishedAt());
         }
     }
 

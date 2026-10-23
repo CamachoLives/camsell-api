@@ -2,6 +2,7 @@ package com.camsell.catalog.infrastructure.persistence;
 
 import com.camsell.catalog.domain.model.Listing;
 import com.camsell.catalog.domain.model.ListingAttribute;
+import com.camsell.catalog.domain.model.ListingCard;
 import com.camsell.catalog.domain.model.ListingImage;
 import com.camsell.catalog.domain.model.ListingSearchQuery;
 import com.camsell.catalog.domain.model.ListingStatus;
@@ -14,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -42,26 +44,26 @@ public class ListingPersistenceAdapter implements ListingRepositoryPort {
     }
 
     @Override
-    public List<Listing> findAllByIds(List<Long> ids) {
-        return repository.findByIdIn(ids).stream().map(this::toDomain).toList();
+    public List<ListingCard> findCardsByIds(List<Long> ids) {
+        return repository.findByIdIn(ids).stream().map(this::toCard).toList();
     }
 
     @Override
-    public PageResult<Listing> search(ListingSearchQuery query, PageQuery page) {
+    public PageResult<ListingCard> search(ListingSearchQuery query, PageQuery page) {
         return PageMappings.toPageResult(
                 repository.findAll(
                         ListingSpecifications.from(query),
                         PageMappings.toPageable(page, SORTABLE, "publishedAt")),
-                this::toDomain);
+                this::toCard);
     }
 
     @Override
-    public List<Listing> findFeatured(int limit) {
+    public List<ListingCard> findFeatured(int limit) {
         return repository.findByFeaturedTrueAndStatusOrderByPublishedAtDesc(
                         ListingStatus.PUBLISHED,
                         PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "publishedAt")))
                 .stream()
-                .map(this::toDomain)
+                .map(this::toCard)
                 .toList();
     }
 
@@ -143,6 +145,41 @@ public class ListingPersistenceAdapter implements ListingRepositoryPort {
     @Override
     public long countBrandsWithListings() {
         return repository.countDistinctBrandsByStatus(ListingStatus.PUBLISHED);
+    }
+
+    /**
+     * Mapeo de tarjeta: toca la coleccion de imagenes pero nunca la de
+     * atributos, de modo que Hibernate no la resuelve. Con el tamano de lote
+     * configurado, las portadas de toda la pagina se traen en una sola
+     * consulta adicional.
+     */
+    private ListingCard toCard(ListingEntity entity) {
+        String coverUrl = entity.getImages().stream()
+                .min(Comparator.comparingInt(ListingImageEntity::getPosition))
+                .map(ListingImageEntity::getUrl)
+                .orElse(null);
+
+        return new ListingCard(
+                entity.getId(),
+                entity.getReference(),
+                entity.getSlug(),
+                entity.getTitle(),
+                entity.getSellerId(),
+                entity.getSellerName(),
+                entity.getBrandId(),
+                entity.getBrandName(),
+                entity.getModelId(),
+                entity.getModelName(),
+                entity.getModelYear(),
+                entity.getMileageKm(),
+                new Money(entity.getPriceAmount(), entity.getPriceCurrency()),
+                entity.isNegotiable(),
+                entity.getCityCode(),
+                entity.getStatus(),
+                entity.isFeatured(),
+                entity.getViewCount(),
+                coverUrl,
+                entity.getPublishedAt());
     }
 
     private Listing toDomain(ListingEntity entity) {

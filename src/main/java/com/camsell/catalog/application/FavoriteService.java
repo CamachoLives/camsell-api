@@ -1,6 +1,6 @@
 package com.camsell.catalog.application;
 
-import com.camsell.catalog.domain.model.Listing;
+import com.camsell.catalog.domain.model.ListingCard;
 import com.camsell.catalog.domain.port.in.FavoriteUseCase;
 import com.camsell.catalog.domain.port.out.FavoriteRepositoryPort;
 import com.camsell.catalog.domain.port.out.ListingRepositoryPort;
@@ -44,9 +44,9 @@ public class FavoriteService implements FavoriteUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Listing> listMine() {
+    public List<ListingCard> listMine() {
         List<Long> ids = favorites.findListingIdsByUser(currentUser.requireCurrentUserId());
-        return ids.isEmpty() ? List.of() : listings.findAllByIds(ids);
+        return ids.isEmpty() ? List.of() : listings.findCardsByIds(ids);
     }
 
     @Override

@@ -15,6 +15,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -90,11 +91,15 @@ public class ListingEntity extends AuditableEntity {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    // Las portadas de toda una pagina se traen en una sola consulta en lugar
+    // de una por publicacion.
+    @BatchSize(size = 64)
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JoinColumn(name = "listing_id", nullable = false)
     @OrderBy("position ASC")
     private List<ListingImageEntity> images = new ArrayList<>();
 
+    @BatchSize(size = 64)
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JoinColumn(name = "listing_id", nullable = false)
     @OrderBy("groupCode ASC")

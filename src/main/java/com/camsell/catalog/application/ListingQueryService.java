@@ -1,6 +1,7 @@
 package com.camsell.catalog.application;
 
 import com.camsell.catalog.domain.model.Listing;
+import com.camsell.catalog.domain.model.ListingCard;
 import com.camsell.catalog.domain.model.ListingSearchQuery;
 import com.camsell.catalog.domain.model.ListingStatus;
 import com.camsell.catalog.domain.port.in.ListingQueryUseCase;
@@ -35,7 +36,7 @@ public class ListingQueryService implements ListingQueryUseCase {
     }
 
     @Override
-    public PageResult<Listing> search(ListingSearchQuery query, PageQuery page) {
+    public PageResult<ListingCard> search(ListingSearchQuery query, PageQuery page) {
         return listings.search(query, page);
     }
 
@@ -62,13 +63,13 @@ public class ListingQueryService implements ListingQueryUseCase {
     }
 
     @Override
-    public List<Listing> featured(int limit) {
+    public List<ListingCard> featured(int limit) {
         int max = properties.catalog().maxFeaturedListings();
         return listings.findFeatured(limit <= 0 ? max : Math.min(limit, max));
     }
 
     @Override
-    public PageResult<Listing> listOwnedByCurrentUser(ListingSearchQuery query, PageQuery page) {
+    public PageResult<ListingCard> listOwnedByCurrentUser(ListingSearchQuery query, PageQuery page) {
         Long sellerId = currentUser.requireCurrentUserId();
         ListingSearchQuery scoped = query.restrictedToSeller(sellerId, EnumSet.allOf(ListingStatus.class));
         return listings.search(scoped, page);

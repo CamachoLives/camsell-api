@@ -1,6 +1,7 @@
 package com.camsell.catalog.domain.port.out;
 
 import com.camsell.catalog.domain.model.Listing;
+import com.camsell.catalog.domain.model.ListingCard;
 import com.camsell.catalog.domain.model.ListingSearchQuery;
 import com.camsell.catalog.domain.model.ListingStatus;
 import com.camsell.shared.domain.page.PageQuery;
@@ -15,11 +16,12 @@ public interface ListingRepositoryPort {
 
     Optional<Listing> findBySlug(String slug);
 
-    List<Listing> findAllByIds(List<Long> ids);
+    List<ListingCard> findCardsByIds(List<Long> ids);
 
-    PageResult<Listing> search(ListingSearchQuery query, PageQuery page);
+    /** Busqueda paginada que devuelve solo lo necesario para las tarjetas. */
+    PageResult<ListingCard> search(ListingSearchQuery query, PageQuery page);
 
-    List<Listing> findFeatured(int limit);
+    List<ListingCard> findFeatured(int limit);
 
     boolean existsBySlug(String slug);
 

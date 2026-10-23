@@ -14,6 +14,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -45,6 +46,8 @@ public class ArticleEntity extends AuditableEntity {
     @Column(name = "category_code", length = 60)
     private String categoryCode;
 
+    // Las etiquetas del feed se resuelven en una consulta por pagina.
+    @BatchSize(size = 64)
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "news_article_tag", joinColumns = @JoinColumn(name = "article_id"))
     @Column(name = "tag", nullable = false, length = 60)
