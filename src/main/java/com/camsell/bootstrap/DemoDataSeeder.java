@@ -614,7 +614,7 @@ public class DemoDataSeeder implements ApplicationRunner {
                 title,
                 excerpt,
                 body,
-                "https://picsum.photos/seed/" + slug + "/1280/720",
+                articleImage(category, ++sequence * 7),
                 category,
                 tags,
                 author.id(),
@@ -655,11 +655,12 @@ public class DemoDataSeeder implements ApplicationRunner {
         String slug = Slugs.of(brandName, modelName, String.valueOf(year));
         String reference = "CAMS-D%04d".formatted(++sequence);
 
+        int sig = sequence * 10;
         List<ListingImage> images = List.of(
-                ListingImage.of("https://picsum.photos/seed/" + slug + "-1/1280/860", title, 0),
-                ListingImage.of("https://picsum.photos/seed/" + slug + "-2/1280/860", title + " interior", 1),
-                ListingImage.of("https://picsum.photos/seed/" + slug + "-3/1280/860", title + " lateral", 2),
-                ListingImage.of("https://picsum.photos/seed/" + slug + "-4/1280/860", title + " motor", 3));
+                ListingImage.of(carImage(brandName, modelName, "exterior", sig),     title, 0),
+                ListingImage.of(carImage(brandName, modelName, "interior", sig + 1), title + " interior", 1),
+                ListingImage.of(carImage(brandName, modelName, "side",     sig + 2), title + " lateral", 2),
+                ListingImage.of(carImage(brandName, modelName, "engine",   sig + 3), title + " motor", 3));
 
         Listing listing = new Listing(
                 null,
@@ -722,5 +723,30 @@ public class DemoDataSeeder implements ApplicationRunner {
 
     private static ListingAttribute flag(String group, boolean value) {
         return ListingAttribute.flag(group, value);
+    }
+
+    private static String carImage(String brand, String model, String view, int sig) {
+        String b = brand.toLowerCase().replace(" ", "+");
+        String m = model.toLowerCase().replace(" ", "+");
+        String terms = switch (view) {
+            case "interior" -> "car+interior+dashboard+cockpit";
+            case "side"     -> b + "+car+side+view";
+            case "engine"   -> "car+engine+motor+hood";
+            default         -> b + "+" + m + "+car+exterior";
+        };
+        return "https://source.unsplash.com/1280x860/?" + terms + "&sig=" + sig;
+    }
+
+    private static String articleImage(String category, int sig) {
+        String terms = switch (category) {
+            case "LAUNCHES"     -> "new+car+launch+auto+show";
+            case "BUYING_GUIDE" -> "car+dealer+showroom+inspection";
+            case "MARKET"       -> "car+lot+dealership+parking";
+            case "TEST_DRIVE"   -> "car+driving+road+highway";
+            case "ELECTRIC"     -> "electric+car+charging+ev";
+            case "MAINTENANCE"  -> "car+mechanic+workshop+service";
+            default             -> "car+automotive";
+        };
+        return "https://source.unsplash.com/1280x720/?" + terms + "&sig=" + sig;
     }
 }
