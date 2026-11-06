@@ -5,6 +5,7 @@ import com.camsell.shared.domain.exception.BusinessRuleException;
 import java.time.Instant;
 import java.time.Year;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Agregado raiz del catalogo: una publicacion de venta de vehiculo. Concentra
@@ -102,17 +103,20 @@ public record Listing(
                 viewCount, publishedAt, createdAt, images, attributes);
     }
 
-    public ListingImage coverImage() {
-        return images.stream()
-                .min((a, b) -> Integer.compare(a.position(), b.position()))
-                .orElse(null);
+    /** Verifica si el usuario dado es el propietario de esta publicacion. */
+    public boolean isOwnedBy(Long userId) {
+        return sellerId != null && sellerId.equals(userId);
     }
 
-    public String attributeValue(String groupCode) {
+    public Optional<ListingImage> coverImage() {
+        return images.stream()
+                .min((a, b) -> Integer.compare(a.position(), b.position()));
+    }
+
+    public Optional<String> attributeValue(String groupCode) {
         return attributes.stream()
                 .filter(attribute -> attribute.groupCode().equals(groupCode))
                 .map(ListingAttribute::displayValue)
-                .findFirst()
-                .orElse(null);
+                .findFirst();
     }
 }
