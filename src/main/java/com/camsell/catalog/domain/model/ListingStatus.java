@@ -16,6 +16,7 @@ public enum ListingStatus {
     ARCHIVED;
 
     private static final Set<ListingStatus> VISIBLE = Set.of(PUBLISHED, RESERVED);
+    private static final Set<ListingStatus> TERMINAL = Set.of(SOLD, ARCHIVED);
 
     public boolean isPubliclyVisible() {
         return VISIBLE.contains(this);
@@ -23,5 +24,13 @@ public enum ListingStatus {
 
     public boolean acceptsOffers() {
         return this == PUBLISHED;
+    }
+
+    /**
+     * Estados que ya no admiten mas transiciones de negocio.
+     * Analogia directa con {@code OfferStatus.isFinal()}.
+     */
+    public boolean isFinal() {
+        return TERMINAL.contains(this);
     }
 }
