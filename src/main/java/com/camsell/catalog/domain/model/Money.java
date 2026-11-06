@@ -29,6 +29,27 @@ public record Money(BigDecimal amount, String currency) {
         return amount.compareTo(other.amount) < 0;
     }
 
+    public boolean isGreaterThan(Money other) {
+        return amount.compareTo(other.amount) > 0;
+    }
+
+    public boolean sameCurrency(Money other) {
+        return currency.equalsIgnoreCase(other.currency);
+    }
+
+    /**
+     * Suma dos cantidades de la misma moneda. Falla si las monedas difieren
+     * para no ocultar errores de conversion en capas superiores.
+     */
+    public Money add(Money other) {
+        if (!sameCurrency(other)) {
+            throw new BusinessRuleException(
+                    "currency_mismatch",
+                    "No se pueden sumar montos de monedas distintas (%s y %s)".formatted(currency, other.currency));
+        }
+        return new Money(amount.add(other.amount), currency);
+    }
+
     /** Porcentaje que representa este valor respecto a otro, para mostrar descuentos. */
     public BigDecimal percentageOf(Money reference) {
         return amount.multiply(BigDecimal.valueOf(100))
