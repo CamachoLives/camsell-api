@@ -17,6 +17,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.net.URI;
@@ -73,6 +74,14 @@ public class ApiExceptionHandler {
                 "Payload ilegible",
                 "El cuerpo de la peticion no es un JSON valido para este recurso",
                 "malformed_payload");
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ProblemDetail onMissingParameter(MissingServletRequestParameterException ex) {
+        return base(HttpStatus.BAD_REQUEST,
+                "Parametro requerido ausente",
+                "El parametro '%s' es obligatorio".formatted(ex.getParameterName()),
+                "missing_parameter");
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
