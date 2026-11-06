@@ -50,6 +50,11 @@ public class RateLimiter {
         buckets.clear();
     }
 
+    /** Numero de claves actualmente vigiladas. Util para metricas y health checks. */
+    public int size() {
+        return buckets.size();
+    }
+
     private static final class Bucket {
 
         private double tokens;
