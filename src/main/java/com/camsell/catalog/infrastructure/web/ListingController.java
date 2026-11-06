@@ -114,7 +114,13 @@ public class ListingController {
                 CachePolicy.PRIVATE);
     }
 
-    /** Convierte {@code GRUPO:OPCION} repetido en el mapa de filtros del dominio. */
+    /**
+     * Convierte {@code GRUPO:OPCION} repetido en el mapa de filtros del dominio.
+     *
+     * <p>El codigo de grupo se normaliza a mayusculas para que clientes que
+     * envien {@code fuel_type:diesel} obtengan los mismos resultados que
+     * {@code FUEL_TYPE:DIESEL}, ya que los grupos se almacenan en uppercase.
+     */
     static Map<String, List<String>> parseAttributeFilters(List<String> raw) {
         if (raw == null || raw.isEmpty()) {
             return Map.of();
@@ -125,7 +131,7 @@ public class ListingController {
                 continue;
             }
             int separator = entry.indexOf(':');
-            String group = entry.substring(0, separator).trim();
+            String group = entry.substring(0, separator).trim().toUpperCase(java.util.Locale.ROOT);
             String option = entry.substring(separator + 1).trim();
             if (group.isEmpty() || option.isEmpty()) {
                 continue;
