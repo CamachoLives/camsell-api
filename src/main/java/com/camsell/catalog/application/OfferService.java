@@ -142,17 +142,22 @@ public class OfferService implements OfferUseCase {
     @Override
     public Offer reject(Long offerId) {
         Offer offer = requireSellerAccess(offerId);
-        return offers.save(offer.transitionTo(OfferStatus.REJECTED, Instant.now()));
+        Offer rejected = offers.save(offer.transitionTo(OfferStatus.REJECTED, Instant.now()));
+        log.info("Oferta {} rechazada; publicacion {}", offerId, offer.listingReference());
+        return rejected;
     }
 
     @Override
     public Offer withdraw(Long offerId) {
         Offer offer = offers.findById(offerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Oferta", offerId));
-        if (!offer.buyerId().equals(currentUser.requireCurrentUserId())) {
+        Long buyerId = currentUser.requireCurrentUserId();
+        if (!offer.buyerId().equals(buyerId)) {
             throw new OperationNotAllowedException("Solo el comprador puede retirar su oferta");
         }
-        return offers.save(offer.transitionTo(OfferStatus.WITHDRAWN, Instant.now()));
+        Offer withdrawn = offers.save(offer.transitionTo(OfferStatus.WITHDRAWN, Instant.now()));
+        log.info("Oferta {} retirada por el comprador {}", offerId, buyerId);
+        return withdrawn;
     }
 
     @Override
