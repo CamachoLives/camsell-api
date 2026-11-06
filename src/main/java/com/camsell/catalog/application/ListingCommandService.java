@@ -46,6 +46,7 @@ public class ListingCommandService implements ListingCommandUseCase {
     private static final Logger log = LoggerFactory.getLogger(ListingCommandService.class);
     private static final String REFERENCE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final int MAX_TITLE_LENGTH = 200;
 
     private final ListingRepositoryPort listings;
     private final ParameterQueryUseCase parameters;
@@ -298,7 +299,12 @@ public class ListingCommandService implements ListingCommandUseCase {
 
     private String resolveTitle(SaveListingCommand command, VehicleModel model) {
         if (command.title() != null && !command.title().isBlank()) {
-            return command.title().trim();
+            String trimmed = command.title().trim();
+            if (trimmed.length() > MAX_TITLE_LENGTH) {
+                log.warn("Titulo demasiado largo ({} caracteres), truncando a {}", trimmed.length(), MAX_TITLE_LENGTH);
+                trimmed = trimmed.substring(0, MAX_TITLE_LENGTH).stripTrailing();
+            }
+            return trimmed;
         }
         return "%s %s %d".formatted(model.brandName(), model.name(), command.year());
     }
@@ -309,6 +315,7 @@ public class ListingCommandService implements ListingCommandUseCase {
             if (!listings.existsByReference(candidate)) {
                 return candidate;
             }
+            log.warn("Colision de referencia en intento {}: {}", attempt + 1, candidate);
         }
         throw new BusinessRuleException("No fue posible generar una referencia unica, intenta de nuevo");
     }
