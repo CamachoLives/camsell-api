@@ -44,4 +44,30 @@ public record ListingSearchQuery(
         return new ListingSearchQuery(text, brandIds, modelIds, minYear, maxYear, minPrice, maxPrice,
                 maxMileage, cityCode, allowedStatuses, id, featured, negotiable, attributeFilters);
     }
+
+    /** Indica si la consulta incluye un filtro de texto libre. */
+    public boolean hasText() {
+        return text != null && !text.isBlank();
+    }
+
+    /** Indica si la consulta incluye al menos un filtro por atributo parametrizado. */
+    public boolean hasAttributeFilters() {
+        return !attributeFilters.isEmpty();
+    }
+
+    /** Indica si la consulta esta sin ningun criterio de acotamiento (devuelve todo el catalogo). */
+    public boolean isUnfiltered() {
+        return !hasText()
+                && brandIds.isEmpty()
+                && modelIds.isEmpty()
+                && minYear == null
+                && maxYear == null
+                && minPrice == null
+                && maxPrice == null
+                && maxMileage == null
+                && cityCode == null
+                && negotiable == null
+                && featured == null
+                && !hasAttributeFilters();
+    }
 }
