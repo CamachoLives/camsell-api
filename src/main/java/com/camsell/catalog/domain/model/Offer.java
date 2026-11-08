@@ -32,4 +32,16 @@ public record Offer(
         return new Offer(id, listingId, listingReference, listingTitle, sellerId, buyerId, buyerName,
                 buyerPhone, amount, message, newStatus, createdAt, now);
     }
+
+    public boolean isPending() {
+        return status == OfferStatus.PENDING;
+    }
+
+    public boolean isAccepted() {
+        return status == OfferStatus.ACCEPTED;
+    }
+
+    public boolean isRejected() {
+        return status == OfferStatus.REJECTED;
+    }
 }
