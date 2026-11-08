@@ -58,6 +58,22 @@ public record Article(
         return Math.max(1, (int) Math.ceil((double) words / WORDS_PER_MINUTE));
     }
 
+    public boolean isPublished() {
+        return status == ArticleStatus.PUBLISHED;
+    }
+
+    public boolean isDraft() {
+        return status == ArticleStatus.DRAFT;
+    }
+
+    public boolean hasExcerpt() {
+        return excerpt != null && !excerpt.isBlank();
+    }
+
+    public boolean hasCategory() {
+        return categoryCode != null && !categoryCode.isBlank();
+    }
+
     public Article withStatus(ArticleStatus newStatus, Instant now) {
         Instant published = newStatus == ArticleStatus.PUBLISHED && publishedAt == null ? now : publishedAt;
         return new Article(id, slug, title, excerpt, body, coverImageUrl, categoryCode, tags, authorId,
