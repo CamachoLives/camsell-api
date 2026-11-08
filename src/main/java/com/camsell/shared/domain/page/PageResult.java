@@ -13,4 +13,16 @@ public record PageResult<T>(List<T> content, int page, int size, long totalEleme
     public <R> PageResult<R> map(Function<T, R> mapper) {
         return new PageResult<>(content.stream().map(mapper).toList(), page, size, totalElements, totalPages);
     }
+
+    public boolean isEmpty() {
+        return content.isEmpty();
+    }
+
+    public boolean isFirst() {
+        return page == 0;
+    }
+
+    public boolean isLast() {
+        return totalPages == 0 || page >= totalPages - 1;
+    }
 }
