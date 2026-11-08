@@ -23,6 +23,18 @@ public record User(
         return role == UserRole.DEALER;
     }
 
+    public boolean isSeller() {
+        return role == UserRole.USER || isDealer();
+    }
+
+    public boolean hasAvatar() {
+        return avatarUrl != null && !avatarUrl.isBlank();
+    }
+
+    public boolean hasPhone() {
+        return phone != null && !phone.isBlank();
+    }
+
     public User withProfile(String newFullName, String newPhone, String newCityCode, String newAvatarUrl) {
         return new User(id, email, passwordHash, newFullName, newPhone, newCityCode, newAvatarUrl,
                 role, active, createdAt);
