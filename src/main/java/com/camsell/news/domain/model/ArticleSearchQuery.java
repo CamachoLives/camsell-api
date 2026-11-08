@@ -16,4 +16,20 @@ public record ArticleSearchQuery(
     public static ArticleSearchQuery publicFeed(String text, String categoryCode, String tag) {
         return new ArticleSearchQuery(text, categoryCode, tag, Set.of(ArticleStatus.PUBLISHED), null);
     }
+
+    public boolean hasText() {
+        return text != null && !text.isBlank();
+    }
+
+    public boolean hasCategory() {
+        return categoryCode != null && !categoryCode.isBlank();
+    }
+
+    public boolean hasTag() {
+        return tag != null && !tag.isBlank();
+    }
+
+    public boolean isUnfiltered() {
+        return !hasText() && !hasCategory() && !hasTag() && featured == null;
+    }
 }
