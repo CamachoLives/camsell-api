@@ -19,4 +19,16 @@ public record Brand(
     public Brand withModels(List<VehicleModel> newModels) {
         return new Brand(id, name, slug, countryOfOrigin, logoUrl, active, newModels);
     }
+
+    public boolean hasLogo() {
+        return logoUrl != null && !logoUrl.isBlank();
+    }
+
+    public List<VehicleModel> activeModels() {
+        return models.stream().filter(VehicleModel::active).toList();
+    }
+
+    public int modelCount() {
+        return models.size();
+    }
 }
