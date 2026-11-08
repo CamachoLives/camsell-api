@@ -10,4 +10,9 @@ public enum OfferStatus {
     public boolean isFinal() {
         return this != PENDING;
     }
+
+    /** Resultado negativo: rechazada por el vendedor o retirada por el comprador. */
+    public boolean isNegative() {
+        return this == REJECTED || this == WITHDRAWN;
+    }
 }
