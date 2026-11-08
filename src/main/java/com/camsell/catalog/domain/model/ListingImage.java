@@ -5,4 +5,12 @@ public record ListingImage(Long id, String url, String alt, int position) {
     public static ListingImage of(String url, String alt, int position) {
         return new ListingImage(null, url, alt, position);
     }
+
+    public boolean isPrimary() {
+        return position == 0;
+    }
+
+    public boolean hasAlt() {
+        return alt != null && !alt.isBlank();
+    }
 }
